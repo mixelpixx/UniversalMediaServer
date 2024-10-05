@@ -238,23 +238,15 @@ public class SearchRequestHandler {
 		return sb.toString();
 	}
 
+
 	private static void addOrderBy(SortCriterion[] orderBy, DbIdMediaType requestType, StringBuilder sb) {
 		sb.append(" ORDER BY ");
-		try {
-			for (SortCriterion sort : orderBy) {
-				if (!StringUtils.isAllBlank(sort.getPropertyName())) {
-					String field = getField(sort.getPropertyName(), requestType);
-					if (!StringUtils.isAllBlank(field)) {
-						sb.append(field);
-						sb.append(sort.isAscending() ? " ASC " : " DESC ");
-						sb.append(", ");
-					}
-				}
-			}
-		} catch (Exception e) {
-			LOGGER.trace("ERROR while processing 'addOrderBy'");
-		}
-		sb.append(String.format(" oid "));
+		Arrays.stream(orderBy)
+			.filter(sort -> !StringUtils.isAllBlank(sort.getPropertyName()))
+			.map(sort -> getField(sort.getPropertyName(), requestType))
+			.filter(field -> !StringUtils.isAllBlank(field))
+			.forEach(field -> sb.append(field).append(sort.isAscending() ? " ASC " : " DESC ").append(", "));
+		sb.append(" oid ");
 	}
 
 	private static void addOrderBy(String sortCriteria, DbIdMediaType requestType, StringBuilder sb) {
@@ -349,7 +341,7 @@ public class SearchRequestHandler {
 
 		// Unicode #2018 is send by iOS (since iOS11) if "Smart Punctuation" is
 		// active.
-		val = val.replaceAll("‘", "''");
+		val = val.replaceAll("â", "''");
 		return val;
 	}
 

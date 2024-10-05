@@ -343,6 +343,7 @@ public class NetworkConfiguration {
 	 * @param parentName
 	 *            The name of the parent network interface.
 	 */
+
 	private static void checkNetworkInterface(Enumeration<NetworkInterface> networkInterfaces, String parentName, boolean showTrace) {
 		if (networkInterfaces == null) {
 			return;
@@ -352,24 +353,37 @@ public class NetworkConfiguration {
 			LOGGER.trace("checkNetworkInterface(parent = {}, child interfaces = {})", parentName, networkInterfaces);
 		}
 
-		while (networkInterfaces.hasMoreElements()) {
-			NetworkInterface ni = networkInterfaces.nextElement();
-
-			if (!skipNetworkInterface(ni.getName(), ni.getDisplayName())) {
-				// check for interface has at least one IP address.
-				checkNetworkInterface(ni, parentName, showTrace);
-			} else {
-				if (showTrace) {
-					synchronized (SKIP_NETWORK_INTERFACES) {
-						LOGGER.trace("child network interface ({},{}) skipped, because skip_network_interfaces='{}'",
-							new Object[] {ni.getName(), ni.getDisplayName(), SKIP_NETWORK_INTERFACES});
-					}
-				}
-			}
-		}
+		Collections.list(networkInterfaces).stream()
+			.filter(ni -> !skipNetworkInterface(ni.getName(), ni.getDisplayName()))
+			.forEach(ni -> checkNetworkInterface(ni, parentName, showTrace));
 
 		if (showTrace) {
 			LOGGER.trace("checkNetworkInterface(parent = {}) finished", parentName);
+		}
+	}
+	
+	private static void addressMapStore(NetworkInterface networkInterface, Set<InetAddress> addrSet) {
+		synchronized (ADDRESS_MAP) {
+			int interfaceIndex = networkInterface.getIndex();
+			Set<InetAddress> oldAddrSet = ADDRESS_MAP.getOrDefault(interfaceIndex, Collections.emptySet());
+			Set<InetAddress> removedAddresses = new HashSet<>(oldAddrSet);
+			removedAddresses.removeAll(addrSet);
+			Set<InetAddress> addedAddresses = new HashSet<>(addrSet);
+			addedAddresses.removeAll(oldAddrSet);
+
+			if (!removedAddresses.isEmpty() || !addedAddresses.isEmpty()) {
+				ADDRESS_MAP.put(interfaceIndex, addrSet);
+				//now advise the listeners
+				removedAddresses.forEach(address -> {
+					LOGGER.trace("address {} is no more mapped to the interface {}({})", address, networkInterface.getName(), interfaceIndex);
+					LISTENERS.forEach(listener -> listener.networkInterfaceAddressRemoved(networkInterface, address));
+				});
+				addedAddresses.forEach(address -> {
+					LOGGER.trace("new found address {} is mapped to the interface {}({})", address, networkInterface.getName(), interfaceIndex);
+					LISTENERS.forEach(listener -> listener.networkInterfaceAddressAdded(networkInterface, address));
+				});
+				cleanListeners();
+			}
 		}
 	}
 
