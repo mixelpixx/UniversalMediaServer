@@ -147,15 +147,10 @@ public class DeviceProtocolInfo implements Serializable {
 
 		String[] elements = protocolInfoString.trim().split(COMMA_SPLIT_REGEX);
 		boolean result = false;
+
 		setsLock.writeLock().lock();
 		try {
-			SortedSet<ProtocolInfo> currentSet;
-			if (protocolInfoSets.containsKey(type)) {
-				currentSet = protocolInfoSets.get(type);
-			} else {
-				currentSet = new TreeSet<>();
-				protocolInfoSets.put(type, currentSet);
-			}
+			SortedSet<ProtocolInfo> currentSet = protocolInfoSets.computeIfAbsent(type, k -> new TreeSet<>());
 
 			SortedSet<ProtocolInfo> tempSet;
 			for (String element : elements) {
@@ -364,15 +359,15 @@ public class DeviceProtocolInfo implements Serializable {
 		SortedSet<ProtocolInfo> result = new TreeSet<>();
 		setsLock.readLock().lock();
 		try {
-			for (SortedSet<ProtocolInfo> set : protocolInfoSets.values()) {
-				if (set != null) {
-					result.addAll(set);
-				}
-			}
+
+			protocolInfoSets.values().stream()
+				.filter(set -> set != null)
+				.forEach(result::addAll);
+
 		} finally {
 			setsLock.readLock().unlock();
 		}
-		return result.toArray(ProtocolInfo[]::new);
+		return result.toArray(new ProtocolInfo[0]);
 	}
 
 	/**
