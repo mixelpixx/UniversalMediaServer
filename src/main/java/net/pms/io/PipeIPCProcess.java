@@ -32,172 +32,169 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class PipeIPCProcess extends Thread implements ProcessWrapper {
-	private static final Logger LOGGER = LoggerFactory.getLogger(PipeIPCProcess.class);
-	private final IPipeProcess mkin;
-	private final IPipeProcess mkout;
-	private StreamModifier modifier;
+public class PipeIPCProcess implements Runnable, ProcessWrapper {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PipeIPCProcess.class);
+    private final IPipeProcess mkin;
+    private final IPipeProcess mkout;
+    private StreamModifier modifier;
 
-	public StreamModifier getModifier() {
-		return modifier;
-	}
+    public StreamModifier getModifier() {
+        return modifier;
+    }
 
-	public void setModifier(StreamModifier modifier) {
-		this.modifier = modifier;
-	}
+    public void setModifier(StreamModifier modifier) {
+        this.modifier = modifier;
+    }
 
-	public PipeIPCProcess(String inPipeName, String outPipeName, boolean inForceReconnect, boolean outForcereconnect) {
-		mkin = PlatformUtils.INSTANCE.getPipeProcess(inPipeName, inForceReconnect ? "reconnect" : "dummy");
-		mkout = PlatformUtils.INSTANCE.getPipeProcess(outPipeName, "out", outForcereconnect ? "reconnect" : "dummy");
-	}
+    public PipeIPCProcess(String inPipeName, String outPipeName, boolean inForceReconnect, boolean outForcereconnect) {
+        mkin = PlatformUtils.INSTANCE.getPipeProcess(inPipeName, inForceReconnect ? "reconnect" : "dummy");
+        mkout = PlatformUtils.INSTANCE.getPipeProcess(outPipeName, outForcereconnect ? "reconnect" : "dummy");
+    }
 
-	@Override
-	public void run() {
-		byte[] b = new byte[512 * 1024];
-		int n;
-		InputStream in = null;
-		OutputStream out = null;
-		OutputStream debug = null;
+    @Override
+    public void run() {
+        byte[] b = new byte[512 * 1024];
+        int n;
+        InputStream in = null;
+        try (OutputStream out = mkout.getOutputStream()) {
+            OutputStream debug = null;
 
-		try {
-			in = mkin.getInputStream();
-			out = mkout.getOutputStream();
+            try {
+                in = mkin.getInputStream();
 
-			if (modifier != null && modifier.isH264AnnexB()) {
-				in = new H264AnnexBInputStream(in, modifier.getHeader());
-			} else if (modifier != null && modifier.isEncodedAudioPassthrough()) {
-				out = new IEC61937AudioOutputStream(new PCMAudioOutputStream(out, modifier.getNbChannels(), modifier.getSampleFrequency(), modifier.getBitsPerSample()));
-			} else if (modifier != null && modifier.isDtsEmbed()) {
-				out = new DTSAudioOutputStream(new PCMAudioOutputStream(out, modifier.getNbChannels(), modifier.getSampleFrequency(), modifier.getBitsPerSample()));
-			} else if (modifier != null && modifier.isPcm()) {
-				out = new PCMAudioOutputStream(out, modifier.getNbChannels(), modifier.getSampleFrequency(), modifier.getBitsPerSample());
-			}
+                if (modifier != null && modifier.isH264AnnexB()) {
+                    in = new H264AnnexBInputStream(in, modifier.getHeader());
+                } else if (modifier != null && modifier.isEncodedAudioPassthrough()) {
+                    out = new IEC61937AudioOutputStream(new PCMAudioOutputStream(out, modifier.getNbChannels(), modifier.getSampleFrequency(), modifier.getBitsPerSample()));
+                } else if (modifier != null && modifier.isDtsEmbed()) {
+                    out = new DTSAudioOutputStream(new PCMAudioOutputStream(out, modifier.getNbChannels(), modifier.getSampleFrequency(), modifier.getBitsPerSample()));
+                } else if (modifier != null && modifier.isPcm()) {
+                    out = new PCMAudioOutputStream(out, modifier.getNbChannels(), modifier.getSampleFrequency(), modifier.getBitsPerSample());
+                }
 
-			if (modifier != null && modifier.getHeader() != null && !modifier.isH264AnnexB()) {
-				out.write(modifier.getHeader());
-			}
+                if (modifier != null && modifier.getHeader() != null && !modifier.isH264AnnexB()) {
+                    out.write(modifier.getHeader());
+                }
 
-			while ((n = in.read(b)) > -1) {
-				out.write(b, 0, n);
+                while ((n = in.read(b)) > -1) {
+                    out.write(b, 0, n);
 
-				if (debug != null) {
-					debug.write(b, 0, n);
-				}
-			}
-		} catch (InterruptedIOException e) {
-			if (LOGGER.isDebugEnabled()) {
-				if (StringUtils.isNotBlank(e.getMessage())) {
-					LOGGER.debug("IPC pipe interrupted after writing {} bytes, shutting down: {}", e.bytesTransferred, e.getMessage());
-				} else {
-					LOGGER.debug("IPC pipe interrupted after writing {} bytes, shutting down...", e.bytesTransferred);
-				}
-				LOGGER.trace("", e);
-			}
-		} catch (IOException e) {
-			LOGGER.warn("An error occurred during IPC piping: {}", e.getMessage());
-			LOGGER.trace("", e);
-		} finally {
-			try {
-				// in and out may not have been initialized
-				if (in != null) {
-					in.close();
-				}
+                    if (debug != null) {
+                        debug.write(b, 0, n);
+                    }
+                }
+            } catch (InterruptedIOException e) {
+                if (LOGGER.isDebugEnabled()) {
+                    if (StringUtils.isNotBlank(e.getMessage())) {
+                        LOGGER.debug("IPC pipe interrupted after writing {} bytes, shutting down: {}", e.bytesTransferred, e.getMessage());
+                    } else {
+                        LOGGER.debug("IPC pipe interrupted after writing {} bytes, shutting down...", e.bytesTransferred);
+                    }
+                    LOGGER.trace("", e);
+                }
+            } catch (IOException e) {
+                LOGGER.warn("An error occurred during IPC piping: {}", e.getMessage());
+                LOGGER.trace("", e);
+            } finally {
+                try {
+                    // in and out may not have been initialized
+                    if (in != null) {
+                        in.close();
+                    }
 
-				if (out != null) {
-					out.close();
-				}
+                    if (debug != null) {
+                        debug.close();
+                    }
+                } catch (IOException e) {
+                    LOGGER.debug("Error closing IPC pipe streams: {}" + e.getMessage());
+                    LOGGER.trace("", e);
+                }
+            }
+        } catch (IOException e) {
+            LOGGER.warn("An error occurred during IPC piping: {}", e.getMessage());
+            LOGGER.trace("", e);
+        }
+    }
 
-				if (debug != null) {
-					debug.close();
-				}
-			} catch (IOException e) {
-				LOGGER.debug("Error closing IPC pipe streams: {}" + e.getMessage());
-				LOGGER.trace("", e);
-			}
-		}
-	}
+    public String getInputPipe() {
+        return mkin.getInputPipe();
+    }
 
-	public String getInputPipe() {
-		return mkin.getInputPipe();
-	}
+    public String getOutputPipe() {
+        return mkout.getOutputPipe();
+    }
 
-	public String getOutputPipe() {
-		return mkout.getOutputPipe();
-	}
+    public ProcessWrapper getPipeProcess() {
+        return this;
+    }
 
-	public ProcessWrapper getPipeProcess() {
-		return this;
-	}
+    public void deleteLater() {
+        mkin.deleteLater();
+        mkout.deleteLater();
+    }
 
-	public void deleteLater() {
-		mkin.deleteLater();
-		mkout.deleteLater();
-	}
+    public InputStream getInputStream() throws IOException {
+        return mkin.getInputStream();
+    }
 
-	public InputStream getInputStream() throws IOException {
-		return mkin.getInputStream();
-	}
+    public OutputStream getOutputStream() throws IOException {
+        return mkout.getOutputStream();
+    }
 
-	public OutputStream getOutputStream() throws IOException {
-		return mkout.getOutputStream();
-	}
+    @Override
+    public InputStream getInputStream(long seek) throws IOException {
+        return null;
+    }
 
-	@Override
-	public InputStream getInputStream(long seek) throws IOException {
-		return null;
-	}
+    @Override
+    public ArrayList<String> getResults() {
+        return null;
+    }
 
-	@Override
-	public ArrayList<String> getResults() {
-		return null;
-	}
+    @Override
+    public boolean isDestroyed() {
+        return isAlive();
+    }
 
-	@Override
-	public boolean isDestroyed() {
-		return isAlive();
-	}
+    @Override
+    public void runInNewThread() {
+        if (!Platform.isWindows()) {
+            mkin.getPipeProcess().runInNewThread();
+            mkout.getPipeProcess().runInNewThread();
 
-	@Override
-	public void runInNewThread() {
-		if (!Platform.isWindows()) {
-			mkin.getPipeProcess().runInNewThread();
-			mkout.getPipeProcess().runInNewThread();
+            // Allow the threads some time to do their work before starting the main thread
+            UMSUtils.sleep(150);
+        }
 
-			// Allow the threads some time to do their work before
-			// starting the main thread
-			UMSUtils.sleep(150);
-		}
+        run();
+    }
 
-		start();
-	}
+    @Override
+    public void runInSameThread() {
+        if (!Platform.isWindows()) {
+            mkin.getPipeProcess().runInNewThread();
+            mkout.getPipeProcess().runInNewThread();
 
-	@Override
-	public void runInSameThread() {
-		if (!Platform.isWindows()) {
-			mkin.getPipeProcess().runInNewThread();
-			mkout.getPipeProcess().runInNewThread();
+            // Allow the threads some time to do their work before running the main thread
+            UMSUtils.sleep(150);
+        }
 
-			// Allow the threads some time to do their work before
-			// running the main thread
-			UMSUtils.sleep(150);
-		}
+        run();
+    }
 
-		run();
-	}
+    @Override
+    public boolean isReadyToStop() {
+        return false;
+    }
 
-	@Override
-	public boolean isReadyToStop() {
-		return false;
-	}
+    @Override
+    public void setReadyToStop(boolean nullable) {
+    }
 
-	@Override
-	public void setReadyToStop(boolean nullable) {
-	}
-
-	@Override
-	public void stopProcess() {
-		this.interrupt();
-		mkin.getPipeProcess().stopProcess();
-		mkout.getPipeProcess().stopProcess();
-	}
+    @Override
+    public void stopProcess() {
+        this.interrupt();
+        mkin.getPipeProcess().stopProcess();
+        mkout.getPipeProcess().stopProcess();
+    }
 }
