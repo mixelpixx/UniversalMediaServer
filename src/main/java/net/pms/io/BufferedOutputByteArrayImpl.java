@@ -23,141 +23,68 @@ import java.io.InputStream;
 
 public class BufferedOutputByteArrayImpl extends ByteArrayOutputStream implements BufferedOutputFile {
 
-	protected BufferedOutputByteArrayImpl(OutputParams params) {
-		super(params.getOutputByteArrayStreamBufferSize() > 512 ? params.getOutputByteArrayStreamBufferSize() : 512);
-	}
+    protected BufferedOutputByteArrayImpl(OutputParams params) {
+        super(params.getOutputByteArrayStreamBufferSize() > 512 ? params.getOutputByteArrayStreamBufferSize() : 512);
+    }
 
-	protected BufferedOutputByteArrayImpl(int size) {
-		super(size);
-	}
+    protected BufferedOutputByteArrayImpl(int size) {
+        super(size);
+    }
 
-	/**
-	 * Returns a {@link ByteArrayInputStream} using the current live buffer.
-	 *
-	 * @param newReadPosition the number of bytes to skip.
-	 * @return The new input stream.
-	 */
-	@Override
-	public synchronized InputStream getInputStream(long newReadPosition) {
-		if (newReadPosition < 0) {
-			throw new IndexOutOfBoundsException("Can't set new read position to a negative value (" + newReadPosition + ")");
-		}
+    /**
+     * Returns a {@link ByteArrayInputStream} using the current live buffer.
+     *
+     * @param newReadPosition the number of bytes to skip.
+     * @return The new input stream.
+     */
+    @Override
+    public synchronized InputStream getInputStream(long newReadPosition) {
+        if (newReadPosition < 0) {
+            throw new IndexOutOfBoundsException("Can't set new read position to a negative value (" + newReadPosition + ")");
+        }
 
-		int length = Math.max(count - (int) newReadPosition, 0);
-		if (newReadPosition > 0 && newReadPosition >= count) {
-			throw new IndexOutOfBoundsException("Can't skip to position " + newReadPosition + " since the length is " + count);
-		}
-		byte[] bufferCopy = new byte[length];
-		System.arraycopy(buf, (int) newReadPosition, bufferCopy, 0, length);
-		return new ByteArrayInputStream(bufferCopy);
-	}
+        int length = Math.max(count - (int) newReadPosition, 0);
+        if (newReadPosition > 0 && newReadPosition >= count) {
+            throw new IndexOutOfBoundsException("Can't skip to position " + newReadPosition + " since the length is " + count);
+        }
+        byte[] bufferCopy = new byte[length];
+        System.arraycopy(buf, (int) newReadPosition, bufferCopy, 0, length);
+        return new ByteArrayInputStream(bufferCopy);
+    }
 
-	/**
-	 * Writes len bytes from the specified byte array starting at offset off to
-	 * the {@link ByteArrayOutputStream}.
-	 *
-	 * @param b the byte array to write from.
-	 * @param off the start offset in the data.
-	 * @param len the number of bytes to write.
-	 */
-	@Override
-	public void write(byte[] b, int off, int len) {
-		super.write(b, off, len);
-	}
+    /**
+     * Writes len bytes from the specified byte array starting at offset off to
+     * the {@link ByteArrayOutputStream}.
+     *
+     * @param b the byte array to write from.
+     * @param off the start offset in the data.
+     * @param len the number of bytes to write.
+     */
+    @Override
+    public void write(byte[] b, int off, int len) {
+        super.write(b, off, len);
+    }
 
-	/**
-	 * Writes the specified byte to the {@link ByteArrayOutputStream}.
-	 *
-	 * @param b the byte to write.
-	 */
-	@Override
-	public void write(int b) {
-		super.write(b);
-	}
+    /**
+     * Writes the specified byte to the {@link ByteArrayOutputStream}.
+     *
+     * @param b the byte to write.
+     */
+    @Override
+    public void write(int b) {
+        super.write(b);
+    }
 
-	/**
-	 * Writes {@code b.length} bytes from the specified byte array to the
-	 * {@link ByteArrayOutputStream}. The general contract for {@code write(b)}
-	 * is that it should have exactly the same effect as the call
-	 * {@code write(b, 0, b.length)}.
-	 *
-	 * @param b the byte array to write.
-	 */
-	@Override
-	public void write(byte[] b) throws IOException {
-		super.write(b);
-	}
-
-	/**
-	 * @deprecated Unused method from interface.
-	 * @return null
-	 */
-	@Deprecated
-	@Override
-	public WaitBufferedInputStream getCurrentInputStream() {
-		return null;
-	}
-
-	/**
-	 * @deprecated Unused method from interface.
-	 * @return 0
-	 */
-	@Deprecated
-	@Override
-	public long getWriteCount() {
-		return 0;
-	}
-
-	/**
-	 * @deprecated Unused method from interface.
-	 * @return 0
-	 */
-	@Deprecated
-	@Override
-	public int read(boolean firstRead, long readCount) {
-		return 0;
-	}
-
-	/**
-	 * @deprecated Unused method from interface.
-	 * @return 0
-	 */
-	@Deprecated
-	@Override
-	public int read(boolean firstRead, long readCount, byte[] b, int off, int len) {
-		return 0;
-	}
-
-	/**
-	 * @deprecated Unused method from interface.
-	 */
-	@Deprecated
-	@Override
-	public void attachThread(ProcessWrapper thread) {
-	}
-
-	/**
-	 * @deprecated Unused method from interface.
-	 */
-	@Deprecated
-	@Override
-	public void reset() {
-	}
-
-	/**
-	 * @deprecated Unused method from interface.
-	 */
-	@Deprecated
-	@Override
-	public void removeInputStream(WaitBufferedInputStream waitBufferedInputStream) {
-	}
-
-
-	/**
-	 * @deprecated Unused method from interface.
-	 */
-	@Deprecated
-	@Override
-	public void detachInputStream() {
-	}
+    /**
+     * Writes {@code b.length} bytes from the specified byte array to the
+     * {@link ByteArrayOutputStream}. The general contract for {@code write(b)}
+     * is that it should have exactly the same effect as the call
+     * {@code write(b, 0, b.length)}.
+     *
+     * @param b the byte array to write.
+     */
+    @Override
+    public void write(byte[] b) throws IOException {
+        super.write(b);
+    }
 }

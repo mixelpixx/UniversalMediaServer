@@ -33,63 +33,63 @@ import org.slf4j.LoggerFactory;
  */
 
 public class ByteArrayOutputStreamConsumer extends OutputConsumer {
-	private static final Logger LOGGER = LoggerFactory.getLogger(ByteArrayOutputStreamConsumer.class);
-	private final ReentrantReadWriteLock outputBufferLock = new ReentrantReadWriteLock();
-	private BufferedOutputByteArrayImpl outputBuffer;
-	private final int bufferSize;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ByteArrayOutputStreamConsumer.class);
+    private final ReentrantReadWriteLock outputBufferLock = new ReentrantReadWriteLock();
+    private BufferedOutputByteArrayImpl outputBuffer;
+    private final int bufferSize;
 
-	/**
-	 * Creates a new instance.
-	 *
-	 * @param inputStream the {@link InputStream} to consume.
-	 * @param params the {@link OutputParams} to use.
-	 */
-	public ByteArrayOutputStreamConsumer(InputStream inputStream, OutputParams params) {
-		super(inputStream);
-		bufferSize = params.getOutputByteArrayStreamBufferSize() > 512 ? params.getOutputByteArrayStreamBufferSize() : 512;
-		outputBuffer = new BufferedOutputByteArrayImpl(bufferSize);
-	}
+    /**
+     * Creates a new instance.
+     *
+     * @param inputStream the {@link InputStream} to consume.
+     * @param params the {@link OutputParams} to use.
+     */
+    public ByteArrayOutputStreamConsumer(InputStream inputStream, OutputParams params) {
+        super(inputStream);
+        bufferSize = params.getOutputByteArrayStreamBufferSize() > 512 ? params.getOutputByteArrayStreamBufferSize() : 512;
+        outputBuffer = new BufferedOutputByteArrayImpl(bufferSize);
+    }
 
-	@Override
-	public void run() {
-		try {
-			byte[] bytes = new byte[Math.min(Math.max(512, bufferSize / 8), 64000)];
-			int n = 0;
-			while ((n = inputStream.read(bytes)) > 0) {
-				outputBufferLock.writeLock().lock();
-				try {
-					outputBuffer.write(bytes, 0, n);
-				} finally {
-					outputBufferLock.writeLock().unlock();
-				}
-			}
-		} catch (IOException e) {
-			LOGGER.debug("IO error while reading process output: {}", e.getMessage());
-			LOGGER.trace("", e);
-		} finally {
-			if (inputStream != null) {
-				try {
-					inputStream.close();
-				} catch (IOException e) {
-					LOGGER.debug("Error closing input stream: {}", e.getMessage());
-					LOGGER.trace("", e);
-				}
-			}
-		}
-	}
+    @Override
+    public void run() {
+        try {
+            byte[] bytes = new byte[Math.min(Math.max(512, bufferSize / 8), 64000)];
+            int n = 0;
+            while ((n = inputStream.read(bytes)) > 0) {
+                outputBufferLock.writeLock().lock();
+                try {
+                    outputBuffer.write(bytes, 0, n);
+                } finally {
+                    outputBufferLock.writeLock().unlock();
+                }
+            }
+        } catch (IOException e) {
+            LOGGER.debug("IO error while reading process output: {}", e.getMessage());
+            LOGGER.trace("", e);
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException e) {
+                    LOGGER.debug("Error closing input stream: {}", e.getMessage());
+                    LOGGER.trace("", e);
+                }
+            }
+        }
+    }
 
-	@Override
-	public BufferedOutputFile getBuffer() {
-		outputBufferLock.readLock().lock();
-		try {
-			return outputBuffer;
-		} finally {
-			outputBufferLock.readLock().unlock();
-		}
-	}
+    @Override
+    public BufferedOutputFile getBuffer() {
+        outputBufferLock.readLock().lock();
+        try {
+            return outputBuffer;
+        } finally {
+            outputBufferLock.readLock().unlock();
+        }
+    }
 
-	@Override
-	public List<String> getResults() {
-		return null;
-	}
+    @Override
+    public List<String> getResults() {
+        return null;
+    }
 }
